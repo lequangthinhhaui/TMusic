@@ -33,7 +33,7 @@ function App() {
 
       <div class="flex flex-1 ">
         <aside class="w-64 text-white ml-2 mr-1 bg-gray-900 border border-gray-900 rounded-lg">
-          <SideBar onSelectFolder={selectFolder} />
+          <SideBar onShowPlaylist={setSongs} />
           {/* <SideBar onAddToPlaylist ={setSongs} /> */}
         </aside>
 

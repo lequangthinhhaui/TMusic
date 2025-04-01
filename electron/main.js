@@ -66,7 +66,7 @@ const path = require("path");
 const fs = require("fs");
 
 let mainWindow;
-
+const PLAYLISTS_FILE = path.join(app.getPath("userData"), "playlists.json");
 app.whenReady().then(() => {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -101,6 +101,53 @@ ipcMain.handle("select-folder", async () => {
   return files;
 });
 
+
+// Open file dialog
+ipcMain.handle("open-file-dialog", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile", "multiSelections"],
+    filters: [{ name: "Audio Files", extensions: ["mp3", "wav", "flac"] }],
+  });
+  return result.filePaths;
+});
+
+// Save playlist
+ipcMain.on("save-playlist", (event, { playlistId, files }) => {
+  let playlists = {};
+  if (fs.existsSync(PLAYLISTS_FILE)) {
+    playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
+  }
+  playlists[playlistId] = files;
+  fs.writeFileSync(PLAYLISTS_FILE, JSON.stringify(playlists, null, 2));
+  console.log(PLAYLISTS_FILE);
+});
+
+// Load playlist
+// ipcMain.handle("load-playlist", async (event, playlistId) => {
+//   if (fs.existsSync(PLAYLISTS_FILE)) {
+//     const playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
+//     return playlists[playlistId] || [];
+//   }
+//   return [];
+// });
+ipcMain.handle("load-playlist", async (event, playlistId) => {
+  try {
+    const playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
+    const playlist = playlists[playlistId] || [];
+
+    // Convert playlist into correct format for the frontend
+    const formattedSongs = playlist.map((filePath, index) => ({
+      id: `song-${playlistId}-${index}`,
+      name: path.basename(filePath), // Extract the filename
+      path: filePath, // Keep the full path for playback
+    }));
+
+    return formattedSongs;
+  } catch (error) {
+    console.error("Error loading playlist:", error);
+    return [];
+  }
+});
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });

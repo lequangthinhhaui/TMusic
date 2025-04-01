@@ -12,10 +12,15 @@
     "dist": "vite build && electron-builder"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.1",
+    "@mui/material": "^7.0.1",
     "concurrently": "^9.1.2",
     "electron-forge": "^5.2.4",
     "lucide-react": "^0.484.0",
     "react": "^19.0.0",
+    "react-dnd": "^16.0.1",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
     "sequelize": "^6.37.6",
