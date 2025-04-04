@@ -1,14 +1,3 @@
-// const { contextBridge, ipcRenderer } = require("electron");
-
-// contextBridge.exposeInMainWorld("electron", {
-//   openFileDialog: () => ipcRenderer.invoke("open-file-dialog"),
-//   savePlaylist: (playlistId, files) => ipcRenderer.send("save-playlist", { playlistId, files }),
-//   loadPlaylist: (playlistId) => ipcRenderer.invoke("load-playlist", playlistId),
-// });
-// preload.js
-
-// preload.js
-
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
@@ -18,10 +7,8 @@ contextBridge.exposeInMainWorld('electron', {
   // Open file dialog to select individual music files
   openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
 
-
-  loadPlaylists: () => ipcRenderer.invoke('load-playlists'), // Exposing load-playlists
-
-
+  // Load all playlists
+  loadPlaylists: () => ipcRenderer.invoke('load-playlists'),
 
   // Create a new playlist
   createPlaylist: (name) => ipcRenderer.invoke('create-playlist', name),
@@ -31,4 +18,10 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Load playlist from SQLite database
   loadPlaylist: (playlistId) => ipcRenderer.invoke('load-playlist', playlistId),
+
+  // Remove a file from a playlist
+  removeFileFromPlaylist: (playlistId, filePath) => ipcRenderer.invoke("remove-file-from-playlist", playlistId, filePath),
+
+  // Remove a playlist
+  removePlaylist: (playlistId) => ipcRenderer.invoke("removePlaylist", playlistId),
 });

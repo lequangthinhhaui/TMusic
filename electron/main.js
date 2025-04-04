@@ -1,66 +1,3 @@
-// main.js (Electron Main Process)
-// const { app, BrowserWindow, dialog, ipcMain } = require("electron");
-// const path = require('path');
-// const fs = require('fs');
-// const { addTask, getTasks, deleteTask } = require("./database");
-
-// let mainWindow;
-
-// app.whenReady().then(() => {
-//   mainWindow = new BrowserWindow({
-//     width: 800,
-//     height: 600,
-//     webPreferences: {
-//         preload: path.join(__dirname, "./preload.js"),
-//         nodeIntegration: false,  // Prevent access to Node.js APIs in renderer
-//         contextIsolation: true,  // Isolate context to prevent prototype pollution
-//         webSecurity: true,       // Enforce security (prevents mixed-content attacks)
-//         allowRunningInsecureContent: false, // Ensure no insecure content is loaded
-//         allowFileAccess: true // Needed for playing local audio files
-//     },
-//   });
-//   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-//     callback({
-//       responseHeaders: {
-//         ...details.responseHeaders,
-//         "Content-Security-Policy": ["default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; media-src 'self' file: data:;"]
-//       }
-//     });
-//   });
-//   // mainWindow.loadURL("http://localhost:5173"); // React dev server
-//   mainWindow.loadURL(`file://${path.join(__dirname, "../dist/index.html").replace(/\\/g, "/")}`);
-
-//   mainWindow.on('closed', () => {
-//     mainWindow = null;
-//   });
-// });
-
-// app.on('window-all-closed', () => {
-//   if (process.platform !== 'darwin') app.quit();
-// });
-
-// app.on('activate', () => {
-//   if (BrowserWindow.getAllWindows().length === 0) app.whenReady();
-// });
-
-// ipcMain.handle('select-folder', async () => {
-//   const result = await dialog.showOpenDialog({
-//     properties: ['openDirectory']
-//   });
-
-//   if (result.canceled || result.filePaths.length === 0) return [];
-  
-//   const folderPath = result.filePaths[0];
-//   const audioExtensions = ['.mp3', '.wav', '.ogg'];
-//   const audioFiles = fs.readdirSync(folderPath)
-//     .filter(file => audioExtensions.includes(path.extname(file).toLowerCase()))
-//     .map(file => `file://${path.join(folderPath, file).replace(/\\/g, '/')}`);
-
-//   return audioFiles;
-// });
-
-
-
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const { Sequelize, DataTypes } = require("sequelize");
@@ -113,44 +50,23 @@ ipcMain.handle("open-file-dialog", async () => {
   return result.filePaths;
 });
 
-// Save playlist
-// ipcMain.on("save-playlist", (event, { playlistId, files }) => {
-//   let playlists = {};
-//   if (fs.existsSync(PLAYLISTS_FILE)) {
-//     playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
-//   }
-//   playlists[playlistId] = files;
-//   fs.writeFileSync(PLAYLISTS_FILE, JSON.stringify(playlists, null, 2));
-//   console.log(PLAYLISTS_FILE);
-// });
+ipcMain.handle("remove-file-from-playlist", async (event, playlistId, filePath) => {
+  try {
+    const result = await PlaylistFile.destroy({
+      where: { playlistId, filePath },
+    });
 
-// Load playlist
-// ipcMain.handle("load-playlist", async (event, playlistId) => {
-//   if (fs.existsSync(PLAYLISTS_FILE)) {
-//     const playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
-//     return playlists[playlistId] || [];
-//   }
-//   return [];
-// });
-// ipcMain.handle("load-playlist", async (event, playlistId) => {
-//   try {
-//     const playlists = JSON.parse(fs.readFileSync(PLAYLISTS_FILE, "utf-8"));
-//     const playlist = playlists[playlistId] || [];
+    if (result === 0) {
+      throw new Error("File not found in playlist");
+    }
 
-//     // Convert playlist into correct format for the frontend
-//     const formattedSongs = playlist.map((filePath, index) => ({
-//       id: `song-${playlistId}-${index}`,
-//       name: path.basename(filePath), // Extract the filename
-//       path: filePath, // Keep the full path for playback
-//     }));
-
-//     return formattedSongs;
-//   } catch (error) {
-//     console.error("Error loading playlist:", error);
-//     return [];
-//   }
-// });
-
+    console.log(`Removed file ${filePath} from playlist ${playlistId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to remove file from playlist:", error);
+    return { success: false, error: error.message };
+  }
+});
 
 // Handle loading all playlists and their associated files
 ipcMain.handle("load-playlists", async () => {
@@ -263,6 +179,31 @@ ipcMain.handle("load-playlist", async (event, playlistId) => {
   } catch (error) {
     console.error("Failed to load playlist files:", error);
     throw error;
+  }
+});
+
+// Handle removing a playlist
+ipcMain.handle("removePlaylist", async (event, playlistId) => {
+  try {
+    // First, remove all associated files from PlaylistFile
+    await PlaylistFile.destroy({
+      where: { playlistId },
+    });
+
+    // Then, remove the playlist itself
+    const result = await Playlist.destroy({
+      where: { id: playlistId },
+    });
+
+    if (result === 0) {
+      throw new Error("Playlist not found");
+    }
+
+    console.log(`Removed playlist ${playlistId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to remove playlist:", error);
+    return { success: false, error: error.message };
   }
 });
 

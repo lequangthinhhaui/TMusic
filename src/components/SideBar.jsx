@@ -1,23 +1,15 @@
 import { useState, useEffect } from "react";
-import { Box, Button, TextField, List, ListItem, ListItemText, Menu, MenuItem, Modal, Typography, createTheme, ThemeProvider } from "@mui/material";
+import { Box, Button, TextField, List, ListItem, ListItemText, Menu, MenuItem, Modal, Typography, createTheme, ThemeProvider, IconButton } from "@mui/material";
+import { Delete } from "@mui/icons-material";
 
 // Dark Mode Theme
 const darkTheme = createTheme({
   palette: {
-    mode: 'dark', // Set to 'dark' for dark mode
-    background: {
-      default: '#121212', // Dark background for the app
-      paper: '#1d1d1d', // Dark background for surface elements like cards
-    },
-    text: {
-      primary: '#fff', // White text color for better contrast on dark background
-    },
-    primary: {
-      main: '#bb86fc', // Accent color (e.g., purple for buttons and highlights)
-    },
-    secondary: {
-      main: '#03dac6', // Another accent color (e.g., teal for buttons)
-    },
+    mode: "dark",
+    background: { default: "#121212", paper: "#1d1d1d" },
+    text: { primary: "#fff" },
+    primary: { main: "#bb86fc" },
+    secondary: { main: "#03dac6" },
   },
 });
 
@@ -26,7 +18,9 @@ const Sidebar = ({ onShowPlaylist }) => {
   const [contextMenu, setContextMenu] = useState(null);
   const [selectedPlaylist, setSelectedPlaylist] = useState(null);
   const [isModalOpen, setModalOpen] = useState(false);
+  const [isRemoveModalOpen, setRemoveModalOpen] = useState(false);
   const [playlistName, setPlaylistName] = useState("");
+  const [selectedPlaylistFiles, setSelectedPlaylistFiles] = useState([]);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -82,20 +76,57 @@ const Sidebar = ({ onShowPlaylist }) => {
     }
   };
 
+  const openRemoveFileModal = async (playlist) => {
+    if (!playlist) return;
+  
+    try {
+      const files = await window.electron.loadPlaylist(playlist.id); // Load files from DB
+      setSelectedPlaylist(playlist);
+      setSelectedPlaylistFiles(files); // Store fetched files
+      setRemoveModalOpen(true);
+    } catch (error) {
+      console.error("Failed to load files:", error);
+    }
+  };
+
+  const removeFileFromPlaylist = async (filePath) => {
+    if (!selectedPlaylist || !filePath) return;
+  
+    try {
+      const result = await window.electron.removeFileFromPlaylist(selectedPlaylist.id, filePath);
+  
+      if (result.success) {
+        // Fetch updated list from DB
+        const updatedFiles = await window.electron.loadPlaylist(selectedPlaylist.id);
+        setSelectedPlaylistFiles(updatedFiles || []); // ✅ Ensure it's always an array
+      } else {
+        console.error("Failed to remove file:", result.error);
+      }
+    } catch (error) {
+      console.error("Error removing file:", error);
+    }
+  };
+
+
+  const removePlaylist = async () => {
+    if (!selectedPlaylist) return;
+
+    try {
+      await window.electron.removePlaylist(selectedPlaylist.id);
+      setPlaylists((prev) => prev.filter((p) => p.id !== selectedPlaylist.id));
+    } catch (error) {
+      console.error("Failed to remove playlist:", error);
+    }
+    setContextMenu(null);
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <Box sx={{ width: 250, bgcolor: "background.paper", p: 2, borderRadius: 2, boxShadow: 3 }}>
-        {/* Create Playlist Button */}
-        <Button
-          variant="contained"
-          color="primary"
-          fullWidth
-          onClick={() => setModalOpen(true)}
-        >
+        <Button variant="contained" color="primary" fullWidth onClick={() => setModalOpen(true)}>
           + Create Playlist
         </Button>
 
-        {/* Playlists List */}
         <List>
           {playlists.map((playlist) => (
             <ListItem
@@ -113,17 +144,23 @@ const Sidebar = ({ onShowPlaylist }) => {
           ))}
         </List>
 
-        {/* Context Menu for Right Click */}
+        {/* Context Menu*/}
         <Menu
           open={Boolean(contextMenu)}
           onClose={() => setContextMenu(null)}
           anchorReference="anchorPosition"
           anchorPosition={contextMenu ? { top: contextMenu.mouseY, left: contextMenu.mouseX } : undefined}
         >
-          <MenuItem onClick={() => selectMusicFiles(selectedPlaylist.id)}>Add Music</MenuItem>
+          {selectedPlaylist && (
+            <>
+              <MenuItem onClick={() => selectMusicFiles(selectedPlaylist.id)}>Add Music</MenuItem>
+              <MenuItem onClick={() => openRemoveFileModal(selectedPlaylist)}>Remove File</MenuItem>
+              <MenuItem onClick={removePlaylist}>Remove Playlist</MenuItem>
+            </>
+          )}
         </Menu>
 
-        {/* Modal for Playlist Creation */}
+        {/* Modal for Creating Playlist */}
         <Modal open={isModalOpen} onClose={() => setModalOpen(false)}>
           <Box
             sx={{
@@ -146,27 +183,48 @@ const Sidebar = ({ onShowPlaylist }) => {
               margin="dense"
               value={playlistName}
               onChange={(e) => setPlaylistName(e.target.value)}
-              error={!playlistName.trim()}
-              helperText={!playlistName.trim() ? "Playlist name cannot be empty." : ""}
             />
             <Box mt={2} sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={() => setModalOpen(false)} sx={{ mr: 1 }}>
                 Cancel
               </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={createPlaylist}
-                disabled={!playlistName.trim()}
-              >
+              <Button variant="contained" color="primary" onClick={createPlaylist}>
                 Create
               </Button>
             </Box>
           </Box>
         </Modal>
+
+        {/* Modal for Removing Files */}
+        <Modal open={isRemoveModalOpen} onClose={() => setRemoveModalOpen(false)}>
+          <Box sx={{ ...modalStyle, minWidth: 400 }}>
+            <Typography variant="h6">Remove a File</Typography>
+            <List>
+              {selectedPlaylistFiles.map((file, index) => (
+                <ListItem key={index}>
+                  <ListItemText primary={file.split("\\").pop()} />
+                  <IconButton onClick={() => removeFileFromPlaylist(file)} color="error">
+                    <Delete />
+                  </IconButton>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Modal>
       </Box>
     </ThemeProvider>
   );
+};
+
+const modalStyle = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  bgcolor: "background.paper",
+  boxShadow: 24,
+  p: 3,
+  borderRadius: 2,
 };
 
 export default Sidebar;
