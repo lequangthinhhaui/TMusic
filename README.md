@@ -1,4 +1,4 @@
-# Install
+# Introduce
 Tmusics: read music files, create the playlist ...
 Tool for use: React JS + Tailwind CSS + Electron JS
 # Install
